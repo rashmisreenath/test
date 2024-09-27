@@ -1,0 +1,30 @@
+login_server <- function(input, output, session) {
+  observeEvent(input$login, {
+    username <- input$username
+    password <- input$password
+    
+    # Replace with your actual authentication logic
+    if (username == "admin" && password == "password") {
+      session$userData$authenticated <- TRUE
+      shinyjs::redirect("main")
+    } else {
+      output$login_status <- renderText("Invalid credentials")
+    }
+  })
+}
+
+login_ui <- function() {
+  fluidPage(
+    titlePanel("Login"),
+    sidebarLayout(
+      sidebarPanel(
+        textInput("username", "Username"),
+        passwordInput("password", "Password"),
+        actionButton("login", "Login")
+      ),
+      mainPanel(
+        textOutput("login_status")
+      )
+    )
+  )
+}
