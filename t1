@@ -28,3 +28,20 @@ login_ui <- function() {
     )
   )
 }
+
+
+
+ observe({
+    current_route <- shiny.router::get_page()
+    if (current_route == "/") {
+      # Trigger event for home page
+      print("Navigated to Home Page")
+    } else if (current_route == "analysis") {
+      if (isTRUE(session$userData$authenticated)) {
+        analysisPage$server('analysis')
+      } else {
+        output$login_status <- renderText("Invalid credentials")
+        shinyjs::redirect("/")
+      }
+    }
+  })
