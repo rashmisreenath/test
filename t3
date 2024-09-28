@@ -1,0 +1,2 @@
+shiny::showTab(inputId = "main_tabs", target = "Welcome", session = session)
+        updateTabsetPanel(session, "main_tabs", selected = "Welcome")
