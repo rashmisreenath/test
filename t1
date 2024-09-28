@@ -1,89 +1,89 @@
-library(shiny)
-library(RSQLite)
+box::use(shiny[...],
+         RSQLite[...])
 
-# Create or connect to the SQLite database
-db <- dbConnect(SQLite(), "users.db")
 
-# Create users table if it doesn't exist
-dbExecute(db, "CREATE TABLE IF NOT EXISTS users (
+#'@export
+ui <- function(id) {
+  ns=NS(id)
+  fluidPage(
+   
+      titlePanel("User Authentication App"),
+      mainPanel(
+        h3("Let' verify you"),
+        p("Use the buttons to create an account or log in.")
+      )
+    )
+    
+  
+}
+
+#'@export
+server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+  
+    
+    db <- dbConnect(SQLite(), "users.db")
+    
+   
+    dbExecute(db, "CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY,
   username TEXT UNIQUE,
   name TEXT,
   password TEXT,
   designation TEXT
 )")
-
-# Define UI for initial modal
-initialModal <- modalDialog(
-  title = "Welcome",
-  actionButton("create_account", "Create Account"),
-  actionButton("login", "Login"),
-  footer = NULL
-)
-
-# Define UI for account creation modal
-
-
-# Define UI for login role selection modal
-loginRoleModal <- modalDialog(
-  title = "Login",
-  actionButton("login_coordinator", "Login as Coordinator"),
-  actionButton("login_contributor", "Login as Contributor"),
-  footer = NULL
-)
-
-# Define UI for login modal
-loginModal <- modalDialog(
-  title = "Login",
-  textInput("username", "Username"),
-  passwordInput("password", "Password"),
-  footer = tagList(
-    modalButton("Cancel"),
-    actionButton("login", "Login")
-  )
-)
-
-# Define server logic
-server <- function(input, output, session) {
-  # Show initial modal when app starts
-  showModal(initialModal)
+    
+    
+  showModal(modalDialog(
+    title = "Welcome",
+    actionButton("create_account", "Create Account"),
+    actionButton("login_btn", "Login"),
+    footer = NULL
+  ))
   
-  # Observe create account button click
+
   observeEvent(input$create_account, {
-    showModal(createAccountModal <- modalDialog(
-  title = "Create Account",
-  textInput("new_username", "Username"),
-  textInput("name", "Name"),
-  passwordInput("new_password", "Password"),
-  selectInput("designation", "Designation", choices = c("Employee", "Manager", "Director")),
-  footer = tagList(
-    modalButton("Cancel"),
-    actionButton("create", "Create Account")
-  )
-))
+    showModal(modalDialog(
+      title = "Create Account",
+      textInput("new_username", "Username"),
+      textInput("name", "Name"),
+      passwordInput("new_password", "Password"),
+      selectInput("designation", "Designation", choices = c("Employee", "Manager", "Director")),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("create", "Create Account")
+      )
+    ))
   })
   
-  # Observe create account action
+ 
   observeEvent(input$create, {
-    # Collect account creation details
+    
     new_username <- input$new_username
     name <- input$name
     new_password <- input$new_password
     designation <- input$designation
-    
-    # Debugging message
-    print(paste("Creating account for:", new_username, name, designation))
-    
-    # Insert new user into the database
+   
     tryCatch({
       dbExecute(db, "INSERT INTO users (username, name, password, designation) VALUES (?, ?, ?, ?)",
                 params = list(new_username, name, new_password, designation))
+      
+      
       showModal(modalDialog(
-        title = "Success",
-        "Account created successfully!",
+        title = "Account Created Successfully",
         easyClose = TRUE,
         footer = NULL
       ))
+      
+      Sys.sleep(1)  
+      removeModal() 
+      showModal(modalDialog(
+        title = "Login",
+        actionButton("login_coordinator", "Login as Coordinator"),
+        actionButton("login_contributor", "Login as Contributor"),
+        footer = NULL
+      ))
+      
     }, error = function(e) {
       showModal(modalDialog(
         title = "Error",
@@ -94,43 +94,78 @@ server <- function(input, output, session) {
     })
   })
   
-  # Observe login button click
-  observeEvent(input$login, {
-    showModal(loginRoleModal)
+
+  observeEvent(input$login_btn, {
+    showModal(modalDialog(
+      title = "Login",
+      actionButton("login_coordinator", "Login as Coordinator"),
+      actionButton("login_contributor", "Login as Contributor"),
+      footer = NULL
+    ))
   })
   
-  # Observe login role selection
+
   observeEvent(input$login_coordinator, {
-    showModal(loginModal)
+    showModal(modalDialog(
+      title = "Login",
+      textInput("username", "Username"),
+      passwordInput("password", "Password"),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("login_action", "Login as Coordinator")
+      )
+    ))
     session$userData$role <- "coordinator"
   })
   
   observeEvent(input$login_contributor, {
-    showModal(loginModal)
+    showModal(modalDialog(
+      title = "Login",
+      textInput("username", "Username"),
+      passwordInput("password", "Password"),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("login_action", "Login as Contributor")
+      )
+    ))
     session$userData$role <- "contributor"
   })
-  
-  # Observe login action
-  observeEvent(input$login, {
+
+  observeEvent(input$login_action, {
     username <- input$username
     password <- input$password
     role <- session$userData$role
     
-    # Validate credentials and role
+
     user <- dbGetQuery(db, "SELECT * FROM users WHERE username = ? AND password = ?", params = list(username, password))
     
     if (nrow(user) == 1) {
       designation <- user$designation
-      if (role == "coordinator" && (designation == "Manager" || designation == "Director")) {
-        removeModal()
-        shiny::shinyAppDir('app')
+      
+      if (role == "coordinator") {
+        
+        if (designation %in% c("Manager", "Director")) {
+          removeModal()
+          showModal(modalDialog(
+            title = "Success",
+            "Successfully logged in as Coordinator",
+            easyClose = TRUE,
+            footer = NULL
+          ))
+        } else {
+          showModal(modalDialog(
+            title = "Error",
+            "Only users with Manager or Director designation can log in as Coordinator",
+            easyClose = TRUE,
+            footer = NULL
+          ))
+        }
       } else if (role == "contributor") {
+  
         removeModal()
-        shiny::shinyAppDir('app')
-      } else {
         showModal(modalDialog(
-          title = "Error",
-          "Invalid role or designation",
+          title = "Success",
+          "Successfully logged in as Contributor",
           easyClose = TRUE,
           footer = NULL
         ))
@@ -144,16 +179,4 @@ server <- function(input, output, session) {
       ))
     }
   })
-}
-
-# Create a temporary Shiny app for the login and account creation process
-ui <- fluidPage(
-  tags$script("Shiny.addCustomMessageHandler('showInitial', function(message) { $('#initialModal').modal('show'); });"),
-  div(id = "initialModal", initialModal),
-  div(id = "createAccountModal", createAccountModal),
-  div(id = "loginRoleModal", loginRoleModal),
-  div(id = "loginModal", loginModal)
-)
-
-# Run the temporary Shiny app for login and account creation
-shinyApp(ui, server)
+})}
