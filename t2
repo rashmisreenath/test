@@ -1,0 +1,67 @@
+body {
+  background-color: #f8f9fa;
+}
+
+.panel {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;  /* Enable flexbox */
+  flex-direction: column;  /* Align items vertically */
+  align-items: center;  /* Center items horizontally */
+}
+
+h3 {
+  color: #007bff;
+  margin-bottom: 20px;  /* Space below the header */
+}
+
+h4 {
+  color: #28a745;
+}
+
+.error-message {
+  color: red;
+}
+
+.success-message {
+  color: green;
+}
+
+.button-custom {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 10px;  /* Space above buttons */
+}
+
+.button-custom:hover {
+  background-color: #0056b3;
+}
+
+.input-custom {
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  padding: 10px;
+  box-sizing: border-box;
+  margin:  5%;  /* Space above and below each input */
+  transition: border-color 0.3s;
+  width: calc(100% - 10px);
+}
+
+.input-custom:focus {
+  border-color: #007bff;
+  outline: none;  /* Remove default outline */
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+  width: calc(100% - 10px);
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  gap: 1px; /* Space between input fields */
+}
