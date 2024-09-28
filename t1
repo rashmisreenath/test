@@ -1,182 +1,124 @@
-box::use(shiny[...],
-         RSQLite[...])
 
+box::use(shiny[...], RSQLite[...])
 
 #'@export
 ui <- function(id) {
-  ns=NS(id)
+  ns = NS(id)
   fluidPage(
-   
-      titlePanel("User Authentication App"),
-      mainPanel(
-        h3("Let' verify you"),
-        p("Use the buttons to create an account or log in.")
+    
+    titlePanel("Integration is the key"),
+    mainPanel(
+      tabsetPanel(
+        id = ns("main_tabs"),
+        tabPanel("Home",
+                 div(class = "panel",
+                     h3("Find candidates for proposal making!"),
+                     p("Click a button to proceed."),
+                     actionButton(ns("create_account_btn"), "Create Account", class = "button-custom"),
+                     actionButton(ns("login_btn"), "Login", class = "button-custom"),
+                     uiOutput(ns("account_management_ui")),
+                     uiOutput(ns("message_ui"))  # Placeholder for messages
+                 )
+        )
       )
     )
-    
-  
+  )
 }
 
 #'@export
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
-  
-    
     db <- dbConnect(SQLite(), "users.db")
     
-   
     dbExecute(db, "CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY,
-  username TEXT UNIQUE,
-  name TEXT,
-  password TEXT,
-  designation TEXT
-)")
+      id INTEGER PRIMARY KEY,
+      username TEXT UNIQUE,
+      name TEXT,
+      password TEXT,
+      designation TEXT
+    )")
     
+   #Create account
+    observeEvent(input$create_account_btn, {
+      output$account_management_ui <- renderUI({
+        div(class = "panel",
+            h4("Create Account"),
+            div(class="account-form",
+            
+            div(textInput(session$ns("new_username"), "Username "), class = "input-custom"),
+            div(textInput(session$ns("name"), "Name "), class = "input-custom"),
+            div(passwordInput(session$ns("new_password"), "Password"), class = "input-custom"),
+            div(selectInput(session$ns("designation"), "Designation", choices = c("Employee", "Manager", "Director"), selected = "Employee"), class = "input-custom"),
+            actionButton(session$ns("create"), "Create Account", class = "button-custom")
+        ))
+      })
+      output$message_ui <- renderUI(NULL)  
+    })
     
-  showModal(modalDialog(
-    title = "Welcome",
-    actionButton("create_account", "Create Account"),
-    actionButton("login_btn", "Login"),
-    footer = NULL
-  ))
-  
-
-  observeEvent(input$create_account, {
-    showModal(modalDialog(
-      title = "Create Account",
-      textInput("new_username", "Username"),
-      textInput("name", "Name"),
-      passwordInput("new_password", "Password"),
-      selectInput("designation", "Designation", choices = c("Employee", "Manager", "Director")),
-      footer = tagList(
-        modalButton("Cancel"),
-        actionButton("create", "Create Account")
-      )
-    ))
-  })
-  
- 
-  observeEvent(input$create, {
+    # Handle login
+    observeEvent(input$login_btn, {
+      output$account_management_ui <- renderUI({
+        div(class = "panel",
+            h4("Login"),
+            div(textInput(session$ns("login_username"), "Username"), class = "input-custom"),
+            div(passwordInput(session$ns("login_password"), "Password"), class = "input-custom"),
+            actionButton(session$ns("login_action"), "Login", class = "button-custom")
+        )
+      })
+      output$message_ui <- renderUI(NULL)  # Clear messages when logging in
+    })
     
-    new_username <- input$new_username
-    name <- input$name
-    new_password <- input$new_password
-    designation <- input$designation
-   
-    tryCatch({
-      dbExecute(db, "INSERT INTO users (username, name, password, designation) VALUES (?, ?, ?, ?)",
-                params = list(new_username, name, new_password, designation))
+    # Handle account creation
+    observeEvent(input$create, {
+      new_username <- input$new_username
+      name <- input$name
+      new_password <- input$new_password
+      designation <- input$designation
       
+      tryCatch({
+        dbExecute(db, "INSERT INTO users (username, name, password, designation) VALUES (?, ?, ?, ?)",
+                  params = list(new_username, name, new_password, designation))
+        
+       
+        output$message_ui <- renderUI({
+          h4("Account Created Successfully!", class = "success-message")
+        })
+        
+        
+        output$account_management_ui <- renderUI(NULL)  
+        
+      }, error = function(e) {
+        output$message_ui <- renderUI({
+          h4("Username already exists!", class = "error-message")
+        })
+        
+        # Hide
+        output$account_management_ui <- renderUI(NULL)  # Hide the form
+      })
+    })
+    
+    # login
+    observeEvent(input$login_action, {
+      username <- input$login_username
+      password <- input$login_password
       
-      showModal(modalDialog(
-        title = "Account Created Successfully",
-        easyClose = TRUE,
-        footer = NULL
-      ))
+      user <- dbGetQuery(db, "SELECT * FROM users WHERE username = ? AND password = ?", params = list(username, password))
       
-      Sys.sleep(1)  
-      removeModal() 
-      showModal(modalDialog(
-        title = "Login",
-        actionButton("login_coordinator", "Login as Coordinator"),
-        actionButton("login_contributor", "Login as Contributor"),
-        footer = NULL
-      ))
-      
-    }, error = function(e) {
-      showModal(modalDialog(
-        title = "Error",
-        "Username already exists!",
-        easyClose = TRUE,
-        footer = NULL
-      ))
+      if (nrow(user) == 1) {
+        designation <- user$designation
+        output$message_ui <- renderUI({
+          h4(paste("Successfully logged in as", designation), class = "success-message")
+        })
+        
+       #hide
+        output$account_management_ui <- renderUI(NULL)
+      } else {
+        output$message_ui <- renderUI({
+          h4("Invalid username or password", class = "error-message")
+        })
+        
+        #hide
+        output$account_management_ui <- renderUI(NULL)  
     })
   })
-  
-
-  observeEvent(input$login_btn, {
-    showModal(modalDialog(
-      title = "Login",
-      actionButton("login_coordinator", "Login as Coordinator"),
-      actionButton("login_contributor", "Login as Contributor"),
-      footer = NULL
-    ))
-  })
-  
-
-  observeEvent(input$login_coordinator, {
-    showModal(modalDialog(
-      title = "Login",
-      textInput("username", "Username"),
-      passwordInput("password", "Password"),
-      footer = tagList(
-        modalButton("Cancel"),
-        actionButton("login_action", "Login as Coordinator")
-      )
-    ))
-    session$userData$role <- "coordinator"
-  })
-  
-  observeEvent(input$login_contributor, {
-    showModal(modalDialog(
-      title = "Login",
-      textInput("username", "Username"),
-      passwordInput("password", "Password"),
-      footer = tagList(
-        modalButton("Cancel"),
-        actionButton("login_action", "Login as Contributor")
-      )
-    ))
-    session$userData$role <- "contributor"
-  })
-
-  observeEvent(input$login_action, {
-    username <- input$username
-    password <- input$password
-    role <- session$userData$role
-    
-
-    user <- dbGetQuery(db, "SELECT * FROM users WHERE username = ? AND password = ?", params = list(username, password))
-    
-    if (nrow(user) == 1) {
-      designation <- user$designation
-      
-      if (role == "coordinator") {
-        
-        if (designation %in% c("Manager", "Director")) {
-          removeModal()
-          showModal(modalDialog(
-            title = "Success",
-            "Successfully logged in as Coordinator",
-            easyClose = TRUE,
-            footer = NULL
-          ))
-        } else {
-          showModal(modalDialog(
-            title = "Error",
-            "Only users with Manager or Director designation can log in as Coordinator",
-            easyClose = TRUE,
-            footer = NULL
-          ))
-        }
-      } else if (role == "contributor") {
-  
-        removeModal()
-        showModal(modalDialog(
-          title = "Success",
-          "Successfully logged in as Contributor",
-          easyClose = TRUE,
-          footer = NULL
-        ))
-      }
-    } else {
-      showModal(modalDialog(
-        title = "Error",
-        "Invalid username or password",
-        easyClose = TRUE,
-        footer = NULL
-      ))
-    }
-  })
-})}
+}
