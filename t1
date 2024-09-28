@@ -1,47 +1,159 @@
-login_server <- function(input, output, session) {
+library(shiny)
+library(RSQLite)
+
+# Create or connect to the SQLite database
+db <- dbConnect(SQLite(), "users.db")
+
+# Create users table if it doesn't exist
+dbExecute(db, "CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY,
+  username TEXT UNIQUE,
+  name TEXT,
+  password TEXT,
+  designation TEXT
+)")
+
+# Define UI for initial modal
+initialModal <- modalDialog(
+  title = "Welcome",
+  actionButton("create_account", "Create Account"),
+  actionButton("login", "Login"),
+  footer = NULL
+)
+
+# Define UI for account creation modal
+
+
+# Define UI for login role selection modal
+loginRoleModal <- modalDialog(
+  title = "Login",
+  actionButton("login_coordinator", "Login as Coordinator"),
+  actionButton("login_contributor", "Login as Contributor"),
+  footer = NULL
+)
+
+# Define UI for login modal
+loginModal <- modalDialog(
+  title = "Login",
+  textInput("username", "Username"),
+  passwordInput("password", "Password"),
+  footer = tagList(
+    modalButton("Cancel"),
+    actionButton("login", "Login")
+  )
+)
+
+# Define server logic
+server <- function(input, output, session) {
+  # Show initial modal when app starts
+  showModal(initialModal)
+  
+  # Observe create account button click
+  observeEvent(input$create_account, {
+    showModal(createAccountModal <- modalDialog(
+  title = "Create Account",
+  textInput("new_username", "Username"),
+  textInput("name", "Name"),
+  passwordInput("new_password", "Password"),
+  selectInput("designation", "Designation", choices = c("Employee", "Manager", "Director")),
+  footer = tagList(
+    modalButton("Cancel"),
+    actionButton("create", "Create Account")
+  )
+))
+  })
+  
+  # Observe create account action
+  observeEvent(input$create, {
+    # Collect account creation details
+    new_username <- input$new_username
+    name <- input$name
+    new_password <- input$new_password
+    designation <- input$designation
+    
+    # Debugging message
+    print(paste("Creating account for:", new_username, name, designation))
+    
+    # Insert new user into the database
+    tryCatch({
+      dbExecute(db, "INSERT INTO users (username, name, password, designation) VALUES (?, ?, ?, ?)",
+                params = list(new_username, name, new_password, designation))
+      showModal(modalDialog(
+        title = "Success",
+        "Account created successfully!",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }, error = function(e) {
+      showModal(modalDialog(
+        title = "Error",
+        "Username already exists!",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    })
+  })
+  
+  # Observe login button click
+  observeEvent(input$login, {
+    showModal(loginRoleModal)
+  })
+  
+  # Observe login role selection
+  observeEvent(input$login_coordinator, {
+    showModal(loginModal)
+    session$userData$role <- "coordinator"
+  })
+  
+  observeEvent(input$login_contributor, {
+    showModal(loginModal)
+    session$userData$role <- "contributor"
+  })
+  
+  # Observe login action
   observeEvent(input$login, {
     username <- input$username
     password <- input$password
+    role <- session$userData$role
     
-    # Replace with your actual authentication logic
-    if (username == "admin" && password == "password") {
-      session$userData$authenticated <- TRUE
-      shinyjs::redirect("main")
-    } else {
-      output$login_status <- renderText("Invalid credentials")
-    }
-  })
-}
-
-login_ui <- function() {
-  fluidPage(
-    titlePanel("Login"),
-    sidebarLayout(
-      sidebarPanel(
-        textInput("username", "Username"),
-        passwordInput("password", "Password"),
-        actionButton("login", "Login")
-      ),
-      mainPanel(
-        textOutput("login_status")
-      )
-    )
-  )
-}
-
-
-
- observe({
-    current_route <- shiny.router::get_page()
-    if (current_route == "/") {
-      # Trigger event for home page
-      print("Navigated to Home Page")
-    } else if (current_route == "analysis") {
-      if (isTRUE(session$userData$authenticated)) {
-        analysisPage$server('analysis')
+    # Validate credentials and role
+    user <- dbGetQuery(db, "SELECT * FROM users WHERE username = ? AND password = ?", params = list(username, password))
+    
+    if (nrow(user) == 1) {
+      designation <- user$designation
+      if (role == "coordinator" && (designation == "Manager" || designation == "Director")) {
+        removeModal()
+        shiny::shinyAppDir('app')
+      } else if (role == "contributor") {
+        removeModal()
+        shiny::shinyAppDir('app')
       } else {
-        output$login_status <- renderText("Invalid credentials")
-        shinyjs::redirect("/")
+        showModal(modalDialog(
+          title = "Error",
+          "Invalid role or designation",
+          easyClose = TRUE,
+          footer = NULL
+        ))
       }
+    } else {
+      showModal(modalDialog(
+        title = "Error",
+        "Invalid username or password",
+        easyClose = TRUE,
+        footer = NULL
+      ))
     }
   })
+}
+
+# Create a temporary Shiny app for the login and account creation process
+ui <- fluidPage(
+  tags$script("Shiny.addCustomMessageHandler('showInitial', function(message) { $('#initialModal').modal('show'); });"),
+  div(id = "initialModal", initialModal),
+  div(id = "createAccountModal", createAccountModal),
+  div(id = "loginRoleModal", loginRoleModal),
+  div(id = "loginModal", loginModal)
+)
+
+# Run the temporary Shiny app for login and account creation
+shinyApp(ui, server)
